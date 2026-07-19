@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Market Analyzer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0d1117;
+      --surface:  #161b22;
+      --border:   #30363d;
+      --text:     #c9d1d9;
+      --muted:    #8b949e;
+      --accent:   #58a6ff;
+      --green:    #3fb950;
+      --red:      #f85149;
+      --yellow:   #d29922;
+      --purple:   #bc8cff;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: .4px;
+    }
+    header span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 0;
+      min-height: calc(100vh - 54px);
+    }
+
+    /* --- Sidebar / Form --- */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .form-group label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: var(--muted);
+    }
+    .form-group input,
+    .form-group select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 8px 10px;
+      font-size: 14px;
+      width: 100%;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .form-group input:focus,
+    .form-group select:focus {
+      border-color: var(--accent);
+    }
+    .form-group input::placeholder { color: var(--muted); }
+
+    select option { background: #161b22; }
+
+    .hint { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    .btn {
+      background: var(--accent);
+      color: #0d1117;
+      border: none;
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      transition: opacity .15s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+    .currency-toggle {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .currency-toggle input[type="radio"] { display: none; }
+    .currency-toggle label {
+      flex: 1;
+      text-align: center;
+      padding: 7px 0;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: background .15s, color .15s;
+      user-select: none;
+    }
+    .currency-toggle input[type="radio"]:checked + label {
+      background: var(--accent);
+      color: #0d1117;
+    }
+
+    .legend {
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .legend-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .triangle-up  { width: 0; height: 0; border-left: 5px solid transparent;
+                    border-right: 5px solid transparent; border-bottom: 9px solid; flex-shrink: 0; }
+    .triangle-down { width: 0; height: 0; border-left: 5px solid transparent;
+                     border-right: 5px solid transparent; border-top: 9px solid; flex-shrink: 0; }
+
+    /* --- Main content --- */
+    .main {
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      overflow-y: auto;
+    }
+
+    /* Error/loading banners */
+    .banner {
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      display: none;
+    }
+    .banner.error  { background: rgba(248,81,73,.12); border: 1px solid rgba(248,81,73,.4); color: var(--red); }
+    .banner.loading { background: rgba(88,166,255,.08); border: 1px solid rgba(88,166,255,.3); color: var(--accent); }
+
+    /* Metric cards */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 12px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 14px 12px;
+    }
+    .card-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .card-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .card-value.green  { color: var(--green); }
+    .card-value.red    { color: var(--red); }
+    .card-value.accent { color: var(--accent); }
+    .card-value.purple { color: var(--purple); }
+    .card-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    /* Forecast banner */
+    .forecast {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .forecast-icon { font-size: 22px; }
+    .forecast-body {}
+    .forecast-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: var(--muted);
+    }
+    .forecast-text { font-size: 14px; color: var(--text); margin-top: 2px; }
+
+    /* Chart */
+    .chart-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .chart-wrap img { width: 100%; display: block; }
+
+    /* Tables section */
+    .tables {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px) { .tables { grid-template-columns: 1fr; } }
+
+    .table-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .table-card h3 {
+      padding: 12px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .table-scroll { overflow-x: auto; max-height: 280px; overflow-y: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    th {
+      padding: 9px 14px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: var(--muted);
+      background: var(--surface);
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      border-bottom: 1px solid var(--border);
+    }
+    td { padding: 8px 14px; border-bottom: 1px solid #21262d; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,.03); }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .3px;
+    }
+    .badge.bos-bull  { background: rgba(63,185,80,.15);  color: var(--green);  }
+    .badge.bos-bear  { background: rgba(248,81,73,.15);  color: var(--red);    }
+    .badge.choch-bull { background: rgba(188,140,255,.15); color: var(--purple); }
+    .badge.choch-bear { background: rgba(188,140,255,.15); color: var(--purple); }
+
+    .dir-bull { color: var(--green); }
+    .dir-bear { color: var(--red); }
+
+    .placeholder {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .placeholder-icon { font-size: 36px; margin-bottom: 12px; opacity: .5; }
+
+    /* empty state */
+    #results { display: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>&#9;&#9220; Stock Analyzer</h1>
+  <span>Break of Structure &amp; Change of Character Detection</span>
+</header>
+
+<div class="layout">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <div class="form-group">
+      <label>Ticker Symbol</label>
+      <input id="ticker" type="text" placeholder="e.g. AAPL, MSFT, BTC-USD" />
+    </div>
+
+    <div class="form-group">
+      <label>Interval</label>
+      <select id="interval">
+        <option value="15m">15 Minutes</option>
+        <option value="1h">1 Hour</option>
+        <option value="1d" selected>1 Day</option>
+        <option value="1wk">1 Week</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Period</label>
+      <select id="period">
+        <option value="5d">5 Days</option>
+        <option value="1mo">1 Month</option>
+        <option value="3mo" selected>3 Months</option>
+        <option value="6mo">6 Months</option>
+        <option value="1y">1 Year</option>
+        <option value="2y">2 Years</option>
+        <option value="5y">5 Years</option>
+      </select>
+      <span class="hint" id="period-hint"></span>
+    </div>
+
+    <div class="form-group">
+      <label>Swing Sensitivity (window)</label>
+      <select id="window">
+        <option value="2">2 — Very Sensitive</option>
+        <option value="3" selected>3 — Default</option>
+        <option value="5">5 — Moderate</option>
+        <option value="7">7 — Strong Swings Only</option>
+      </select>
+      <span class="hint">Higher = fewer but more significant swings</span>
+    </div>
+
+    <div class="form-group">
+      <label>Currency</label>
+      <div class="currency-toggle">
+        <input type="radio" name="currency" id="cur-usd" value="USD" checked />
+        <label for="cur-usd">$ USD</label>
+        <input type="radio" name="currency" id="cur-eur" value="EUR" />
+        <label for="cur-eur">€ EUR</label>
+      </div>
+    </div>
+
+    <button class="btn" id="analyze-btn" onclick="runAnalysis()">
+      &#9654; Run Analysis
+    </button>
+
+    <div class="legend">
+      <div class="legend-title">Legend</div>
+      <div class="legend-item">
+        <div class="triangle-up" style="border-bottom-color:var(--red)"></div>
+        Swing High
+      </div>
+      <div class="legend-item">
+        <div class="triangle-down" style="border-top-color:var(--green)"></div>
+        Swing Low
+      </div>
+      <div class="legend-item">
+        <div class="dot" style="background:var(--accent)"></div>
+        BOS Bullish (break above SH)
+      </div>
+      <div class="legend-item">
+        <div class="dot" style="background:var(--red)"></div>
+        BOS Bearish (break below SL)
+      </div>
+      <div class="legend-item">
+        <div class="dot" style="background:var(--purple)"></div>
+        CHoCH (trend reversal signal)
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <main class="main">
+
+    <div class="banner error"  id="error-banner"></div>
+    <div class="banner loading" id="loading-banner">Fetching &amp; analysing data…</div>
+
+    <!-- Empty state -->
+    <div class="placeholder" id="empty-state">
+      <div class="placeholder-icon">&#128200;</div>
+      Enter a ticker symbol and click <strong>Run Analysis</strong> to begin.
+    </div>
+
+    <!-- Results (hidden until first analysis) -->
+    <div id="results">
+
+      <!-- Metric cards -->
+      <div class="cards">
+        <div class="card">
+          <div class="card-label">Current Price</div>
+          <div class="card-value accent" id="m-price">—</div>
+          <div class="card-sub" id="m-ticker-lbl"></div>
+        </div>
+        <div class="card">
+          <div class="card-label">Period Change</div>
+          <div class="card-value" id="m-change">—</div>
+          <div class="card-sub" id="m-change-pct"></div>
+        </div>
+        <div class="card">
+          <div class="card-label">Period High</div>
+          <div class="card-value green" id="m-high">—</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Period Low</div>
+          <div class="card-value red" id="m-low">—</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Trend</div>
+          <div class="card-value" id="m-trend">—</div>
+        </div>
+        <div class="card">
+          <div class="card-label">BOS Events</div>
+          <div class="card-value accent" id="m-bos">—</div>
+        </div>
+        <div class="card">
+          <div class="card-label">CHoCH Events</div>
+          <div class="card-value purple" id="m-choch">—</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Data Points</div>
+          <div class="card-value" id="m-bars">—</div>
+        </div>
+      </div>
+
+      <!-- Forecast -->
+      <div class="forecast">
+        <div class="forecast-icon" id="fc-icon">&#8212;</div>
+        <div class="forecast-body">
+          <div class="forecast-label">Market Forecast</div>
+          <div class="forecast-text" id="fc-text">—</div>
+        </div>
+      </div>
+
+      <!-- Chart -->
+      <div class="chart-wrap">
+        <img id="chart-img" src="" alt="Analysis chart" />
+      </div>
+
+      <!-- Tables -->
+      <div class="tables">
+
+        <!-- Signals table -->
+        <div class="table-card">
+          <h3>&#9889; BOS / CHoCH Signals</h3>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Datetime</th>
+                  <th>Type</th>
+                  <th>Direction</th>
+                  <th>Close</th>
+                  <th>Broken Level</th>
+                </tr>
+              </thead>
+              <tbody id="signals-tbody">
+                <tr><td colspan="5" style="color:var(--muted);text-align:center;padding:20px">No signals</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Swing points table -->
+        <div class="table-card">
+          <h3>&#9650; Swing Highs &nbsp;&#9660; Swing Lows (last 15 each)</h3>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Datetime</th>
+                  <th>Type</th>
+                  <th>Price</th>
+                </tr>
+              </thead>
+              <tbody id="swings-tbody">
+                <tr><td colspan="3" style="color:var(--muted);text-align:center;padding:20px">No data</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /results -->
+  </main>
+</div>
+
+<script>
+  // --- Period constraints by interval ---
+  const MAX_PERIOD = {
+    '1m':  ['5d','7d'],
+    '2m':  ['5d','1mo'],
+    '5m':  ['5d','1mo'],
+    '15m': ['5d','1mo'],
+    '30m': ['5d','1mo'],
+    '60m': ['5d','1mo','3mo','6mo','1y','2y'],
+    '1h':  ['5d','1mo','3mo','6mo','1y','2y'],
+    '90m': ['5d','1mo'],
+    '1d':  ['5d','1mo','3mo','6mo','1y','2y','5y'],
+    '5d':  ['1mo','3mo','6mo','1y','2y','5y'],
+    '1wk': ['3mo','6mo','1y','2y','5y'],
+    '1mo': ['1y','2y','5y'],
+  };
+
+  const ALL_PERIODS = ['5d','1mo','3mo','6mo','1y','2y','5y'];
+
+  function updatePeriodOptions() {
+    const interval = document.getElementById('interval').value;
+    const allowed = MAX_PERIOD[interval] || ALL_PERIODS;
+    const sel = document.getElementById('period');
+    const current = sel.value;
+
+    Array.from(sel.options).forEach(opt => {
+      opt.disabled = !allowed.includes(opt.value);
+    });
+
+    if (!allowed.includes(sel.value)) {
+      sel.value = allowed[allowed.length - 1];
+    }
+
+    const hint = document.getElementById('period-hint');
+    if (['15m','30m','1m','2m','5m','90m'].includes(interval)) {
+      hint.textContent = 'Max 60 days for this interval.';
+    } else if (['60m','1h'].includes(interval)) {
+      hint.textContent = 'Max 2 years for this interval.';
+    } else {
+      hint.textContent = '';
+    }
+  }
+
+  document.getElementById('interval').addEventListener('change', updatePeriodOptions);
+  updatePeriodOptions();
+
+  // --- Helpers ---
+  let _currency = 'USD';
+
+  function fmtPrice(n) {
+    if (n == null) return '—';
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: _currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(n);
+  }
+
+  function fmt(n, decimals = 2) {
+    if (n == null) return '—';
+    return new Intl.NumberFormat(undefined, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }).format(n);
+  }
+
+  function fmtVol(n) {
+    if (n == null) return '—';
+    const f = (v, d) => new Intl.NumberFormat(undefined, { maximumFractionDigits: d }).format(v);
+    if (n >= 1e9) return f(n / 1e9, 2) + 'B';
+    if (n >= 1e6) return f(n / 1e6, 2) + 'M';
+    if (n >= 1e3) return f(n / 1e3, 1) + 'K';
+    return f(n, 0);
+  }
+
+  function setText(id, val)   { document.getElementById(id).textContent = val; }
+  function setClass(id, cls)  { document.getElementById(id).className = 'card-value ' + cls; }
+
+  // --- Main analysis call ---
+  async function runAnalysis() {
+    const ticker   = document.getElementById('ticker').value.trim().toUpperCase();
+    const period   = document.getElementById('period').value;
+    const interval = document.getElementById('interval').value;
+    const window_  = document.getElementById('window').value;
+    const currency = document.querySelector('input[name="currency"]:checked').value;
+
+    if (!ticker) {
+      showError('Please enter a ticker symbol.');
+      return;
+    }
+
+    const btn = document.getElementById('analyze-btn');
+    btn.disabled = true;
+    btn.textContent = 'Analysing…';
+    hideError();
+    showLoading();
+    document.getElementById('empty-state').style.display = 'none';
+
+    try {
+      const resp = await fetch('/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticker, period, interval, window: window_, currency }),
+      });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        showError(data.error || 'Unknown error.');
+        return;
+      }
+
+      renderResults(data);
+    } catch (e) {
+      showError('Network error: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '▶ Run Analysis';
+      hideLoading();
+    }
+  }
+
+  function renderResults(data) {
+    const m = data.metrics;
+    _currency = data.currency || 'USD';
+
+    // Cards
+    setText('m-price',      fmtPrice(m.current_price));
+    setText('m-ticker-lbl', `${data.ticker} · ${data.interval} · ${data.period} · ${data.currency}`);
+
+    const changeEl = document.getElementById('m-change');
+    changeEl.textContent = (m.price_change >= 0 ? '+' : '') + fmtPrice(m.price_change);
+    changeEl.className = 'card-value ' + (m.price_change >= 0 ? 'green' : 'red');
+
+    setText('m-change-pct', (m.price_change_pct >= 0 ? '+' : '') + fmt(m.price_change_pct) + '%');
+    setText('m-high',  fmtPrice(m.period_high));
+    setText('m-low',   fmtPrice(m.period_low));
+
+    const trendEl = document.getElementById('m-trend');
+    if (m.trend === 'up') {
+      trendEl.textContent = '▲ Bullish';
+      trendEl.className = 'card-value green';
+    } else if (m.trend === 'down') {
+      trendEl.textContent = '▼ Bearish';
+      trendEl.className = 'card-value red';
+    } else {
+      trendEl.textContent = '— Undefined';
+      trendEl.className = 'card-value';
+    }
+
+    setText('m-bos',   m.bos_count);
+    setText('m-choch', m.choch_count);
+    setText('m-bars',  data.data_points);
+
+    // Forecast
+    const fcIcon = document.getElementById('fc-icon');
+    if (m.trend === 'up')   { fcIcon.textContent = '📈'; }
+    else if (m.trend === 'down') { fcIcon.textContent = '📉'; }
+    else { fcIcon.textContent = '➡️'; }
+    setText('fc-text', m.forecast);
+
+    // Chart
+    const img = document.getElementById('chart-img');
+    img.src = 'data:image/png;base64,' + data.chart;
+
+    // Signals table
+    const sigTbody = document.getElementById('signals-tbody');
+    if (data.signals.length === 0) {
+      sigTbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:20px">No signals detected</td></tr>';
+    } else {
+      sigTbody.innerHTML = data.signals.map(s => {
+        const isBull = s.direction === 'bullish';
+        const isCHoCH = s.type === 'CHoCH';
+        const badgeClass = isCHoCH
+          ? (isBull ? 'choch-bull' : 'choch-bear')
+          : (isBull ? 'bos-bull' : 'bos-bear');
+        const dirIcon = isBull ? '▲' : '▼';
+        const dirClass = isBull ? 'dir-bull' : 'dir-bear';
+        return `<tr>
+          <td style="color:var(--muted);font-size:11px">${s.datetime}</td>
+          <td><span class="badge ${badgeClass}">${s.type}</span></td>
+          <td class="${dirClass}">${dirIcon} ${s.direction}</td>
+          <td>${fmtPrice(s.price)}</td>
+          <td style="color:var(--muted)">${fmtPrice(s.broken_level)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // Swings table
+    const swingRows = [
+      ...data.swing_highs.map(sh => ({ ...sh, kind: 'high' })),
+      ...data.swing_lows.map(sl =>  ({ ...sl, kind: 'low'  })),
+    ].sort((a, b) => a.datetime.localeCompare(b.datetime));
+
+    const swingTbody = document.getElementById('swings-tbody');
+    if (swingRows.length === 0) {
+      swingTbody.innerHTML = '<tr><td colspan="3" style="color:var(--muted);text-align:center;padding:20px">No swing points detected</td></tr>';
+    } else {
+      swingTbody.innerHTML = swingRows.map(r => {
+        const isHigh = r.kind === 'high';
+        const label = isHigh
+          ? '<span class="badge bos-bull">&#9650; High</span>'
+          : '<span class="badge bos-bear">&#9660; Low</span>';
+        return `<tr>
+          <td style="color:var(--muted);font-size:11px">${r.datetime}</td>
+          <td>${label}</td>
+          <td>${fmtPrice(r.price)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    document.getElementById('results').style.display = 'flex';
+    document.getElementById('results').style.flexDirection = 'column';
+    document.getElementById('results').style.gap = '20px';
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-banner');
+    el.textContent = '⚠ ' + msg;
+    el.style.display = 'block';
+  }
+  function hideError() {
+    document.getElementById('error-banner').style.display = 'none';
+  }
+  function showLoading() {
+    document.getElementById('loading-banner').style.display = 'block';
+  }
+  function hideLoading() {
+    document.getElementById('loading-banner').style.display = 'none';
+  }
+
+  // Allow Enter key in ticker field
+  document.getElementById('ticker').addEventListener('keydown', e => {
+    if (e.key === 'Enter') runAnalysis();
+  });
+</script>
+</body>
+</html>

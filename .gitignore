@@ -1,0 +1,14 @@
+# Virtualenv
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# PyInstaller
+build/
+dist/
+
+# Claude Code
+.claude/worktrees/
+docs/scratch/
