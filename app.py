@@ -3,11 +3,10 @@ from flask import Flask, render_template, request, jsonify
 from analyzer import run_analysis, INTERVAL_MAX_PERIOD
 
 if getattr(sys, 'frozen', False):
-    # Running inside a py2app bundle — resources sit two levels above the binary
-    _resources = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'Resources')
-    _template_folder = os.path.join(_resources, 'templates')
+    # Running inside a PyInstaller bundle — data files are unpacked into _MEIPASS
+    _template_folder = os.path.join(getattr(sys, '_MEIPASS'), 'templates')
 else:
-    _template_folder = 'templates'
+    _template_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
 
 app = Flask(__name__, template_folder=_template_folder)
 
