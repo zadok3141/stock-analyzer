@@ -15,6 +15,11 @@ and passed to the page as a base64 PNG.
 
 ## Running from source
 
+Both the commands below and the packaging build use [uv](https://docs.astral.sh/uv/)
+— see [installing uv](https://docs.astral.sh/uv/getting-started/installation/) if
+you do not have it. Plain `python -m venv` and `pip` work equally well if you
+prefer them.
+
 ```
 uv venv --python 3.13 .venv
 VIRTUAL_ENV=.venv uv pip install -r requirements.txt
