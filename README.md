@@ -35,6 +35,77 @@ To run the Flask app directly in debug mode on a fixed port instead:
 .venv/bin/python app.py     # http://127.0.0.1:5000
 ```
 
+## Running a released binary
+
+Builds for all three platforms are attached to each [release](../../releases),
+and every push to `main` also produces them as
+[Actions artifacts](../../actions). Nothing needs installing — no Python, no
+dependencies. The binary starts a local server, opens your browser, and prints
+its URL; it keeps running until you stop it.
+
+**Both the macOS and Windows binaries are unsigned**, so each operating system
+blocks them on first launch. Neither warning indicates anything is wrong with
+the file — they mean nobody has paid for a signing certificate. The steps below
+are the standard way past each.
+
+### Windows
+
+Download `stock-analyzer-windows-x86_64.exe` (64-bit Intel/AMD; Windows on ARM
+is not built).
+
+Double-click it. SmartScreen will show **"Windows protected your PC"** — click
+**More info**, then **Run anyway**. Windows remembers the choice, so this is a
+one-time step per downloaded copy.
+
+A console window opens, prints the URL, and your browser follows. Leave the
+console open while you use the app; closing it, or pressing Ctrl-C in it, quits
+the server.
+
+Some antivirus products flag PyInstaller executables as suspicious. This is a
+well-known false positive — self-extracting binaries and malware packers look
+alike to heuristic scanners. If your scanner quarantines it, either allow-list
+the file or build from source instead.
+
+### macOS
+
+Download `stock-analyzer-macos-arm64`.
+
+**Apple Silicon only.** The release binary is built on an arm64 runner and will
+not run on an Intel Mac — Rosetta does not help, as it translates Intel to ARM
+and not the reverse. On an Intel Mac, run from source or build your own binary
+there.
+
+The download arrives without the executable bit, so set it first:
+
+```
+chmod +x stock-analyzer-macos-arm64
+```
+
+Then launch it from Terminal:
+
+```
+./stock-analyzer-macos-arm64
+```
+
+Gatekeeper will refuse the first launch, reporting that the developer cannot be
+verified. Two ways past it:
+
+- Open **System Settings → Privacy & Security**, scroll to the message naming
+  the blocked binary, and click **Open Anyway**. This is the reliable route on
+  current macOS.
+- Or strip the quarantine attribute the browser attached on download:
+
+  ```
+  xattr -d com.apple.quarantine stock-analyzer-macos-arm64
+  ```
+
+Older instructions suggest right-clicking and choosing Open. That bypass has
+been progressively restricted in recent macOS versions, so prefer the two
+methods above.
+
+Once running, the Terminal window prints the URL and opens your browser. Ctrl-C
+in that window quits the server.
+
 ## Packaging
 
 The app is bundled with **PyInstaller** into a single self-contained executable.
