@@ -1,5 +1,7 @@
 # Technical notes
 
+*[Deutsche Fassung](TECHNICAL.de.md)*
+
 Build, API and behaviour details for Stock Analyzer. See [README](README.md) to
 just run the app, and [DEPLOYMENT.md](DEPLOYMENT.md) for unimplemented options
 for hosting it as a web service.

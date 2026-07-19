@@ -1,5 +1,7 @@
 # Stock Analyzer
 
+*[Deutsche Fassung](README.de.md)*
+
 Type in a stock ticker — `AAPL`, `MSFT`, `TSLA` — and this app fetches its recent
 price history from Yahoo Finance and draws a chart of it, marking the points
 where the price changed direction.
