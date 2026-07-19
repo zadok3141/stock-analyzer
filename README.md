@@ -40,24 +40,30 @@ has no Python and no site-packages requirement on the target machine.
 ```
 uv venv --python 3.13 .venv-build          # clean: NOT --system-site-packages
 VIRTUAL_ENV=.venv-build uv pip install -r requirements.txt pyinstaller
-.venv-build/bin/pyinstaller --noconfirm --onefile --name stock-analyzer \
-    --add-data "templates:templates" \
-    --collect-data yfinance --collect-data certifi \
-    main.py
+.venv-build/bin/pyinstaller --noconfirm stock-analyzer.spec
+python scripts/smoke_test.py dist/stock-analyzer
 ```
 
 Output lands in `dist/stock-analyzer` (~70 MB).
 
-Three details in that invocation are load-bearing:
+The build is driven by `stock-analyzer.spec` rather than command-line flags,
+because `--add-data` takes a `:` separator on Linux/macOS and `;` on Windows —
+the spec's tuples mean the same thing everywhere. Three things in it are
+load-bearing:
 
 - **The build venv must be clean.** Do not use `--system-site-packages`, or
   PyInstaller will sweep system Arch packages into the bundle.
-- `--add-data "templates:templates"` ships `index.html`. Without it the app
-  builds fine and then 500s on the first request. The path separator is `:` on
-  Linux/macOS and `;` on Windows.
-- `--collect-data yfinance --collect-data certifi` ships the TLS CA bundle and
-  yfinance's data files. Without them, live requests fail on certificate
-  verification.
+- `('templates', 'templates')` ships `index.html`. Leave it out and PyInstaller
+  fails the build outright, which is the good case — it cannot silently produce
+  a bundle that 500s at runtime.
+- `collect_data_files('yfinance')` and `collect_data_files('certifi')` ship
+  yfinance's data files and the TLS CA bundle. Without them, live requests fail
+  on certificate verification.
+
+`scripts/smoke_test.py` launches a built binary and checks it actually serves —
+a bundle can compile and still fail at runtime, and this is what catches that.
+It exercises only offline routes; `/analyze` is excluded so CI does not depend
+on Yahoo being reachable.
 
 `app.py` branches on `sys.frozen` to resolve the template folder out of
 `sys._MEIPASS`, which is where PyInstaller unpacks bundled data at runtime. That
@@ -68,8 +74,19 @@ branch is inert when running from source.
 **PyInstaller does not cross-compile.** The binary embeds a native CPython plus
 platform-specific compiled wheels (numpy, pandas, matplotlib, curl_cffi), so a
 Linux build is an ELF binary and will not run on macOS or Windows. Producing all
-three means running the same command above on all three operating systems —
-normally a GitHub Actions matrix, since that supplies macOS and Windows runners.
+three means running the same build on all three operating systems.
+
+`.github/workflows/build.yml` does exactly that: a matrix over `ubuntu-latest`,
+`macos-latest` (Apple Silicon) and `windows-latest`, each running the spec build
+and then the smoke test, uploading one artifact per platform. It runs on pushes
+and PRs to `main`, and can be triggered by hand from the Actions tab.
+
+Pushing a `v*` tag additionally publishes a GitHub release with all three
+binaries attached:
+
+```
+git tag v1.0.0 && git push origin v1.0.0
+```
 
 The Linux binary links only `libc`, `libz`, `libpthread` and `libdl`, with a
 GLIBC floor of 2.14, so it runs on effectively any modern distribution.

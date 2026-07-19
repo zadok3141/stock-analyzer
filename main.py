@@ -1,3 +1,4 @@
+import os
 import socket
 import threading
 import time
@@ -40,7 +41,11 @@ if __name__ == '__main__':
     if not _wait_for_flask(url):
         raise SystemExit('Stock Analyzer: the local server failed to start.')
 
-    webbrowser.open(url)
+    # Set STOCK_ANALYZER_NO_BROWSER=1 to leave the browser closed — used by the
+    # CI smoke test, where there is nothing to open a page with.
+    if not os.environ.get('STOCK_ANALYZER_NO_BROWSER'):
+        webbrowser.open(url)
+
     print(f'Stock Analyzer is running at {url}')
     print('Close this window to quit.')
 

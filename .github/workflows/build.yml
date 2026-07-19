@@ -1,0 +1,107 @@
+name: Build
+
+# PyInstaller does not cross-compile: the bundle embeds a native CPython plus
+# platform-specific compiled wheels (numpy, pandas, matplotlib, curl_cffi).
+# Each binary must therefore be built on its own operating system.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false        # one platform failing should not hide the others
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux-x86_64
+            binary: dist/stock-analyzer
+            artifact: stock-analyzer-linux-x86_64
+          - os: macos-latest
+            name: macos-arm64        # macos-latest runners are Apple Silicon
+            binary: dist/stock-analyzer
+            artifact: stock-analyzer-macos-arm64
+          - os: windows-latest
+            name: windows-x86_64
+            binary: dist/stock-analyzer.exe
+            artifact: stock-analyzer-windows-x86_64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Build
+        run: pyinstaller --noconfirm stock-analyzer.spec
+
+      - name: Smoke test the binary
+        run: python scripts/smoke_test.py ${{ matrix.binary }}
+
+      - name: Report size
+        shell: bash
+        run: ls -lh ${{ matrix.binary }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.binary }}
+          if-no-files-found: error
+          retention-days: 30
+
+  # Tagging v* publishes a release with all three binaries attached.
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # required to create the release
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Rename binaries for release
+        run: |
+          mkdir -p release
+          for d in artifacts/*/; do
+            name=$(basename "$d")
+            f=$(find "$d" -type f | head -1)
+            case "$name" in
+              *windows*) cp "$f" "release/$name.exe" ;;
+              *)         cp "$f" "release/$name" ;;
+            esac
+          done
+          ls -lh release/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
+          body: |
+            Self-contained builds — no Python installation required.
+
+            **macOS and Windows binaries are unsigned.** macOS blocks them until
+            you right-click the binary and choose Open (Gatekeeper); Windows
+            shows a SmartScreen warning you must click through.
+
+            The app starts a local server, opens your browser, and prints its
+            URL. Ctrl-C in the terminal to quit.
